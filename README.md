@@ -1,5 +1,3 @@
-Here is a high-level design overview for each part of the "petri" project, detailing their purpose, design philosophy, and core responsibilities.
-
 ***
 
 ## **High-Level Design Overview: The Petri Ecosystem**
