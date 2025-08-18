@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  world:
+    build: ./world
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./world/app:/app/app
+      - ./world/alembic:/app/alembic
+      - ./world/alembic.ini:/app/alembic.ini
+    env_file:
+      - ./world/.env
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./world/.env
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

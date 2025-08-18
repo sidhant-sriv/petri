@@ -1,0 +1,40 @@
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.env
+.venv/
+venv/
+
+# macOS system files
+.DS_Store
+
+# VSCode settings
+.vscode/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.mypy_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDEs and editors
+.idea/
+*.swp
+*.swo
