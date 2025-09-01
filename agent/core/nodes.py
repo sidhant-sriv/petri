@@ -80,6 +80,7 @@ def perceive(state: AgentState) -> AgentState:
     return state
 
 
+#TODO: The post summary creation can be moved to a new function to reduce complexity
 def router_node(state: AgentState) -> AgentState:
     """
     Router node that makes decisions based on persona and feed.
@@ -275,7 +276,7 @@ def router_node(state: AgentState) -> AgentState:
             )
 
         # Update state with decision
-        state["llm_decision"] = decision.dict()
+        state["llm_decision"] = decision.model_dump()
         state["action_to_perform"] = decision.action.upper()
         state["output_text"] = decision.content
         state["target_post_id"] = decision.target_post_id
@@ -319,6 +320,7 @@ def route_decision(state: AgentState) -> str:
         return "end"
 
 
+#TODO: use switch statement to reduce simplicity
 def act(state: AgentState) -> AgentState:
     """
     Execute the agent's decision by interacting with the world.
