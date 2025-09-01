@@ -14,17 +14,17 @@ def create_router_prompt(
     agent_name: str,
     persona: str,
     own_posts: List[PostSummary],
-    other_posts: List[PostSummary]
+    other_posts: List[PostSummary],
 ) -> str:
     """
     Create the router prompt for decision making.
-    
+
     Args:
         agent_name: The name of the agent
         persona: The agent's persona description
         own_posts: List of posts authored by this agent
         other_posts: List of posts by other agents
-        
+
     Returns:
         The formatted prompt string
     """

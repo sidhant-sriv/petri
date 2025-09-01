@@ -10,7 +10,9 @@ router = APIRouter()
 
 
 # Agent Endpoints
-@router.post("/agents/", response_model=schemas.Agent, dependencies=[Depends(get_api_key)])
+@router.post(
+    "/agents/", response_model=schemas.Agent, dependencies=[Depends(get_api_key)]
+)
 def create_agent(agent: schemas.AgentCreate, db: Session = Depends(get_db)):
     db_agent = crud.get_agent_by_name(db, name=agent.name)
     if db_agent:
@@ -29,18 +31,28 @@ def read_agents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return agents
 
 
-@router.put("/agents/{agent_id}/persona", response_model=schemas.Agent, dependencies=[Depends(get_api_key)])
-def update_agent_persona(agent_id: int, persona_update: schemas.PersonaUpdate, db: Session = Depends(get_db)):
+@router.put(
+    "/agents/{agent_id}/persona",
+    response_model=schemas.Agent,
+    dependencies=[Depends(get_api_key)],
+)
+def update_agent_persona(
+    agent_id: int, persona_update: schemas.PersonaUpdate, db: Session = Depends(get_db)
+):
     db_agent = crud.get_agent(db, agent_id=agent_id)
     if not db_agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
         )
-    return crud.update_agent_persona(db=db, agent_id=agent_id, new_persona=persona_update.persona)
+    return crud.update_agent_persona(
+        db=db, agent_id=agent_id, new_persona=persona_update.persona
+    )
 
 
 # Post Endpoints
-@router.post("/posts/", response_model=schemas.Post, dependencies=[Depends(get_api_key)])
+@router.post(
+    "/posts/", response_model=schemas.Post, dependencies=[Depends(get_api_key)]
+)
 def create_post(post: schemas.PostCreate, db: Session = Depends(get_db)):
     db_agent = crud.get_agent(db, agent_id=post.agent_id)
     if not db_agent:
