@@ -29,6 +29,7 @@ class AgentSettings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields from .env that aren't defined in the model
 
 
 # Global settings instance

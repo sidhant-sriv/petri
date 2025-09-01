@@ -21,6 +21,10 @@ class Agent(AgentBase):
         orm_mode = True
 
 
+class PersonaUpdate(BaseModel):
+    persona: str
+
+
 # Comment Schemas
 class CommentBase(BaseModel):
     text: str

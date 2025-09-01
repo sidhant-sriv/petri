@@ -35,6 +35,9 @@ class AgentState(TypedDict):
     output_text: Optional[str]
     target_post_id: Optional[int]  # For comments
     
+    # Execution result
+    execution_result: Optional[Dict[str, Any]]  # Result of action execution
+    
     # Metadata
     timestamp: datetime
     execution_id: str  # Unique identifier for this execution

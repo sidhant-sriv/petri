@@ -9,7 +9,6 @@ thought process: Perceive, Remember, Think, and Act.
 import json
 import uuid
 from datetime import datetime
-from typing import Dict, Any, List
 
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
@@ -17,7 +16,15 @@ from langchain_core.messages import HumanMessage
 from .state import AgentState
 from .schemas import AgentDecision, PostSummary, FeedContext
 from .config import settings
-from ..tools.world_tools import get_feed, get_agent
+from ..tools.world_tools import get_feed, get_agent, ACTION_TOOLS
+
+
+def _get_action_tool(tool_name: str):
+    """Helper function to get an action tool by name from ACTION_TOOLS collection."""
+    for tool in ACTION_TOOLS:
+        if tool.name == tool_name:
+            return tool
+    return None
 
 
 def load_agent_details(state: AgentState) -> AgentState:
@@ -332,29 +339,149 @@ def act(state: AgentState) -> AgentState:
     """
     Execute the agent's decision by interacting with the world.
     
-    This is a placeholder implementation that logs the action.
-    In the full implementation, this would call the world API.
+    This function implements the actual world interactions by calling
+    the appropriate world API tools based on the agent's decision.
     """
     action = state.get("action_to_perform", "DO_NOTHING")
+    agent_id = state["agent_id"]
     
     print(f"🎬 {state['agent_name']} is executing action: {action}")
     
-    if action == "POST":
-        print(f"📄 Creating new post: {state.get('output_text', 'No content')}")
-        # TODO: Call world API to create post
+    try:
+        if action == "POST":
+            content = state.get('output_text', '')
+            if content:
+                print(f"📄 Creating new post: {content[:100]}...")
+                create_post_tool = _get_action_tool('create_post')
+                if create_post_tool:
+                    result = create_post_tool.invoke({"agent_id": agent_id, "text": content})
+                else:
+                    result = {"success": False, "error": "create_post tool not found"}
+                
+                if result.get("success"):
+                    print(f"✅ Post created successfully: ID {result['post']['id']}")
+                    state["execution_result"] = {
+                        "success": True,
+                        "action": "post",
+                        "post_id": result['post']['id'],
+                        "message": "Post created successfully"
+                    }
+                else:
+                    print(f"❌ Failed to create post: {result.get('error', 'Unknown error')}")
+                    state["execution_result"] = {
+                        "success": False,
+                        "action": "post",
+                        "error": result.get("error", "Unknown error")
+                    }
+            else:
+                print("⚠️ No content provided for post creation")
+                state["execution_result"] = {
+                    "success": False,
+                    "action": "post",
+                    "error": "No content provided"
+                }
+                
+        elif action == "COMMENT":
+            content = state.get('output_text', '')
+            target_post_id = state.get('target_post_id')
+            
+            if content and target_post_id:
+                print(f"💬 Commenting on post {target_post_id}: {content[:100]}...")
+                create_comment_tool = _get_action_tool('create_comment')
+                if create_comment_tool:
+                    result = create_comment_tool.invoke({
+                        "agent_id": agent_id, 
+                        "post_id": target_post_id, 
+                        "text": content
+                    })
+                else:
+                    result = {"success": False, "error": "create_comment tool not found"}
+                
+                if result.get("success"):
+                    print(f"✅ Comment created successfully: ID {result['comment']['id']}")
+                    state["execution_result"] = {
+                        "success": True,
+                        "action": "comment",
+                        "comment_id": result['comment']['id'],
+                        "post_id": target_post_id,
+                        "message": "Comment created successfully"
+                    }
+                else:
+                    print(f"❌ Failed to create comment: {result.get('error', 'Unknown error')}")
+                    state["execution_result"] = {
+                        "success": False,
+                        "action": "comment",
+                        "error": result.get("error", "Unknown error")
+                    }
+            else:
+                missing = []
+                if not content:
+                    missing.append("content")
+                if not target_post_id:
+                    missing.append("target_post_id")
+                error_msg = f"Missing required fields: {', '.join(missing)}"
+                print(f"⚠️ {error_msg}")
+                state["execution_result"] = {
+                    "success": False,
+                    "action": "comment",
+                    "error": error_msg
+                }
+                
+        elif action == "UPDATE_PERSONA":
+            new_persona = state["llm_decision"].get("new_persona")
+            
+            if new_persona:
+                print(f"🔄 Updating persona to: {new_persona[:100]}...")
+                update_persona_tool = _get_action_tool('update_agent_persona')
+                if update_persona_tool:
+                    result = update_persona_tool.invoke({
+                        "agent_id": agent_id, 
+                        "new_persona": new_persona
+                    })
+                else:
+                    result = {"success": False, "error": "update_agent_persona tool not found"}
+                
+                if result.get("success"):
+                    print(f"✅ Persona updated successfully")
+                    # Update the state to reflect the new persona
+                    state["persona"] = new_persona
+                    state["execution_result"] = {
+                        "success": True,
+                        "action": "update_persona",
+                        "new_persona": new_persona,
+                        "message": "Persona updated successfully"
+                    }
+                else:
+                    print(f"❌ Failed to update persona: {result.get('error', 'Unknown error')}")
+                    state["execution_result"] = {
+                        "success": False,
+                        "action": "update_persona",
+                        "error": result.get("error", "Unknown error")
+                    }
+            else:
+                print("⚠️ No new persona provided for update")
+                state["execution_result"] = {
+                    "success": False,
+                    "action": "update_persona",
+                    "error": "No new persona provided"
+                }
+                
+        else:
+            print("😴 Doing nothing, staying quiet")
+            state["execution_result"] = {
+                "success": True,
+                "action": "do_nothing",
+                "message": "Agent chose to remain quiet"
+            }
         
-    elif action == "COMMENT":
-        print(f"💬 Commenting on post {state.get('target_post_id')}: {state.get('output_text', 'No content')}")
-        # TODO: Call world API to create comment
-        
-    elif action == "UPDATE_PERSONA":
-        new_persona = state["llm_decision"].get("new_persona")
-        print(f"🔄 Updating persona to: {new_persona}")
-        # TODO: Call world API to update agent persona
-        
-    else:
-        print("😴 Doing nothing, staying quiet")
+    except Exception as e:
+        print(f"❌ Unexpected error during action execution: {e}")
+        state["execution_result"] = {
+            "success": False,
+            "action": action.lower(),
+            "error": f"Unexpected error: {str(e)}"
+        }
     
-    print(f"✅ Action {action} completed")
+    print(f"🏁 Action {action} execution completed")
     
     return state

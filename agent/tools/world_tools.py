@@ -831,5 +831,148 @@ ANALYSIS_TOOLS = [
     get_world_mood
 ]
 
+# ============================================================================
+# ACTION TOOLS FOR AGENT EXECUTION
+# ============================================================================
+
+@tool
+def create_post(agent_id: int, text: str) -> Dict[str, Any]:
+    """
+    Create a new post in the world.
+    
+    Used by agents when they decide to create new content and share their
+    thoughts with the world.
+    
+    Args:
+        agent_id: The ID of the agent creating the post
+        text: The content of the post
+        
+    Returns:
+        Dict containing the created post information or error details
+    """
+    try:
+        post_data = {
+            "text": text,
+            "agent_id": agent_id
+        }
+        
+        result = _make_request("/api/posts/", method="POST", data=post_data)
+        
+        logger.info(f"✅ Created post for agent {agent_id}: {text[:50]}...")
+        return {
+            "success": True,
+            "post": result,
+            "message": "Post created successfully"
+        }
+    except WorldAPIError as e:
+        logger.error(f"❌ Failed to create post: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to create post"
+        }
+
+
+@tool
+def create_comment(agent_id: int, post_id: int, text: str) -> Dict[str, Any]:
+    """
+    Create a new comment on a specific post.
+    
+    Used by agents when they decide to engage with existing posts by
+    commenting on them.
+    
+    Args:
+        agent_id: The ID of the agent creating the comment
+        post_id: The ID of the post to comment on
+        text: The content of the comment
+        
+    Returns:
+        Dict containing the created comment information or error details
+    """
+    try:
+        comment_data = {
+            "text": text,
+            "agent_id": agent_id
+        }
+        
+        result = _make_request(f"/api/posts/{post_id}/comments/", method="POST", data=comment_data)
+        
+        logger.info(f"✅ Created comment on post {post_id} for agent {agent_id}: {text[:50]}...")
+        return {
+            "success": True,
+            "comment": result,
+            "message": "Comment created successfully"
+        }
+    except WorldAPIError as e:
+        logger.error(f"❌ Failed to create comment: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to create comment"
+        }
+
+
+@tool
+def update_agent_persona(agent_id: int, new_persona: str) -> Dict[str, Any]:
+    """
+    Update an agent's persona to reflect growth and evolution.
+    
+    Used by agents when they decide to update their personality or
+    worldview based on their experiences and interactions.
+    
+    Args:
+        agent_id: The ID of the agent to update
+        new_persona: The new persona description
+        
+    Returns:
+        Dict containing the updated agent information or error details
+    """
+    try:
+        persona_data = {
+            "persona": new_persona
+        }
+        
+        result = _make_request(f"/api/agents/{agent_id}/persona", method="PUT", data=persona_data)
+        
+        logger.info(f"✅ Updated persona for agent {agent_id}: {new_persona[:50]}...")
+        return {
+            "success": True,
+            "agent": result,
+            "message": "Persona updated successfully"
+        }
+    except WorldAPIError as e:
+        logger.error(f"❌ Failed to update persona: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to update persona"
+        }
+
+
+# ============================================================================
+# TOOL COLLECTIONS FOR DIFFERENT AGENT PHASES
+# ============================================================================
+
+# Tools for executing actions
+ACTION_TOOLS = [
+    create_post,
+    create_comment,
+    update_agent_persona
+]
+
 # All tools combined
-ALL_WORLD_TOOLS = PERCEPTION_TOOLS + MEMORY_TOOLS + ANALYSIS_TOOLS
+ALL_WORLD_TOOLS = PERCEPTION_TOOLS + MEMORY_TOOLS + ANALYSIS_TOOLS + ACTION_TOOLS
+
+# Export the tools and collections
+__all__ = [
+    # Core functions
+    'get_agent', 'get_agents', 'get_agent_by_name', 'get_feed', 'get_posts_by_agent',
+    'get_recent_posts', 'search_posts', 'get_comments_by_post', 'get_comments_by_agent',
+    'get_recent_comments', 'get_filtered_feed', 'get_agent_stats', 'get_world_stats',
+    
+    # Tool collections
+    'PERCEPTION_TOOLS', 'MEMORY_TOOLS', 'ANALYSIS_TOOLS', 'ACTION_TOOLS', 'ALL_WORLD_TOOLS',
+    
+    # Exception class
+    'WorldAPIError'
+]

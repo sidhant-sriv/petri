@@ -23,6 +23,15 @@ def create_agent(db: Session, agent: schemas.AgentCreate):
     return db_agent
 
 
+def update_agent_persona(db: Session, agent_id: int, new_persona: str):
+    db_agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    if db_agent:
+        db_agent.persona = new_persona
+        db.commit()
+        db.refresh(db_agent)
+    return db_agent
+
+
 # Post CRUD
 def get_post(db: Session, post_id: int):
     return db.query(models.Post).filter(models.Post.id == post_id).first()
