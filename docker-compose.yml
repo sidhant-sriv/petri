@@ -1,25 +1,13 @@
-version: "3.8"
-
 services:
-  world:
-    build: ./world
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./world/app:/app/app
-      - ./world/alembic:/app/alembic
-      - ./world/alembic.ini:/app/alembic.ini
-    env_file:
-      - ./world/.env
-    depends_on:
-      db:
-        condition: service_healthy
+  # PostgreSQL Database
   db:
     image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-petri_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-petri_password}
+      POSTGRES_DB: ${POSTGRES_DB:-petri_world}
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    env_file:
-      - ./world/.env
     ports:
       - "5432:5432"
     healthcheck:
@@ -27,6 +15,131 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - petri_network
+
+  # Neo4j Database for Agent Memory
+  neo4j:
+    image: neo4j:5.15
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-neo4j_password}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-neo4j_password}", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - petri_network
+
+  # Redis for Job Queue
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - petri_network
+
+
+
+  # World Service (The Environment)
+  world:
+    build: 
+      context: .
+      dockerfile: ./world/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./world/app:/app/app
+      - ./world/alembic:/app/alembic
+      - ./world/alembic.ini:/app/alembic.ini
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-petri_user}:${POSTGRES_PASSWORD:-petri_password}@db:5432/${POSTGRES_DB:-petri_world}
+      API_KEY: ${API_KEY:-your_super_secret_api_key_here}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - petri_network
+
+  # Agent Development Environment (Jupyter + Agent Library)
+  agent-dev:
+    build:
+      context: .
+      dockerfile: ./agent/Dockerfile
+    ports:
+      - "8888:8888"  # Jupyter
+    volumes:
+      - ./agent:/app/agent
+      - jupyter_data:/app/.jupyter
+    environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-petri_jupyter_token}
+      WORLD_API_URL: http://world:8000
+      API_KEY: ${API_KEY:-your_super_secret_api_key_here}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_password}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      world:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
+    networks:
+      - petri_network
+
+  # Agent Manager (The Conductor) - Future Implementation
+  agent-manager:
+    build:
+      context: .
+      dockerfile: ./agent-manager/Dockerfile
+    environment:
+      WORLD_API_URL: http://world:8000
+      API_KEY: ${API_KEY:-your_super_secret_api_key_here}
+      REDIS_URL: redis://redis:6379/0
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_password}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      world:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks:
+      - petri_network
+    # Uncomment when ready to run agent-manager
+    # profiles:
+    #   - production
 
 volumes:
   postgres_data:
+  neo4j_data:
+  neo4j_logs:
+  redis_data:
+
+  jupyter_data:
+
+networks:
+  petri_network:
+    driver: bridge

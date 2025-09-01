@@ -1,0 +1,30 @@
+# Docker Compose Override for Development
+# This file provides development-specific configurations
+# It automatically merges with docker-compose.yml
+
+services:
+  world:
+    volumes:
+      # Mount source code for hot reloading in development
+      - ./world/app:/app/app:ro
+      - ./world/alembic:/app/alembic:ro
+      - ./world/alembic.ini:/app/alembic.ini:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  agent-dev:
+    volumes:
+      # Mount agent source for development
+      - ./agent:/app/agent:rw
+      - ./notebooks:/app/notebooks:rw
+    environment:
+      # Development-specific settings
+      JUPYTER_ENABLE_LAB: "yes"
+
+  agent-manager:
+    volumes:
+      # Mount source for development
+      - ./agent-manager:/app/agent-manager:ro
+      - ./agent:/app/agent:ro
+    # Disable agent-manager by default in development
+    profiles:
+      - production

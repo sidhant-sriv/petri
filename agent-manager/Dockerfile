@@ -11,14 +11,20 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the unified requirements file from project root
+# Copy the unified requirements file
 COPY ../requirements.txt /app/
 
-# Install any needed packages specified in requirements.txt
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application's code into the container at /app
-COPY ./app /app/app
+# Copy the agent-manager source code
+COPY . /app/agent-manager/
 
-# Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy the agent module (needed for worker processes)
+COPY ../agent /app/agent/
+
+# Set Python path to include both modules
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+# Command to run the agent manager
+CMD ["python", "agent-manager/main.py"]
