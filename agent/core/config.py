@@ -28,8 +28,7 @@ class AgentSettings(BaseSettings):
     NEO4J_PASSWORD: str = "neo4j_password"
 
     # LLM Configuration (Legacy - for backward compatibility)
-    OLLAMA_BASE_URL: str = "http://host.docker.internal:11434"
-    GEMINI_API_KEY: Optional[str] = None
+    OLLAMA_BASE_URL: str = "http://host.docker.internal:114434"
     
     # LLM Configuration File
     LLM_CONFIG_PATH: str = "agent/config/llm_config.yml"

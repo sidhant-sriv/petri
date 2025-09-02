@@ -39,30 +39,6 @@ class OllamaConfig(BaseLLMConfig):
     format: Optional[str] = None  # For structured output
 
 
-class OpenAIConfig(BaseLLMConfig):
-    """Configuration for OpenAI LLM provider."""
-    provider: Literal["openai"] = "openai"
-    api_key: str
-    organization: Optional[str] = None
-    api_base: Optional[str] = None
-
-
-class AnthropicConfig(BaseLLMConfig):
-    """Configuration for Anthropic LLM provider."""
-    provider: Literal["anthropic"] = "anthropic"
-    api_key: str
-    api_url: Optional[str] = None
-
-
-class AzureOpenAIConfig(BaseLLMConfig):
-    """Configuration for Azure OpenAI LLM provider."""
-    provider: Literal["azure_openai"] = "azure_openai"
-    api_key: str
-    azure_endpoint: str
-    api_version: str = "2024-02-15-preview"
-    deployment_name: str
-
-
 class GoogleConfig(BaseLLMConfig):
     """Configuration for Google/Gemini LLM provider."""
     provider: Literal["google"] = "google"
@@ -125,12 +101,6 @@ class LLMFactory:
         
         if config.provider == "ollama":
             return LLMFactory._create_ollama(params)
-        elif config.provider == "openai":
-            return LLMFactory._create_openai(params)
-        elif config.provider == "anthropic":
-            return LLMFactory._create_anthropic(params)
-        elif config.provider == "azure_openai":
-            return LLMFactory._create_azure_openai(params)
         elif config.provider == "google":
             return LLMFactory._create_google(params)
         elif config.provider == "groq":
@@ -155,74 +125,6 @@ class LLMFactory:
             ollama_params["num_predict"] = params["max_tokens"]
             
         return ChatOllama(**ollama_params)
-    
-    @staticmethod
-    def _create_openai(params: Dict[str, Any]) -> BaseLanguageModel:
-        """Create OpenAI LLM instance."""
-        try:
-            from langchain_openai import ChatOpenAI
-            
-            openai_params = {
-                "model": params["model"],
-                "temperature": params.get("temperature", 0.7),
-                "openai_api_key": params["api_key"],
-                "timeout": params.get("timeout", 30),
-            }
-            
-            if params.get("max_tokens"):
-                openai_params["max_tokens"] = params["max_tokens"]
-            if params.get("organization"):
-                openai_params["openai_organization"] = params["organization"]
-            if params.get("api_base"):
-                openai_params["openai_api_base"] = params["api_base"]
-                
-            return ChatOpenAI(**openai_params)
-        except ImportError:
-            raise ImportError("langchain_openai not available. Install with: pip install langchain-openai")
-    
-    @staticmethod
-    def _create_anthropic(params: Dict[str, Any]) -> BaseLanguageModel:
-        """Create Anthropic LLM instance."""
-        try:
-            from langchain_anthropic import ChatAnthropic
-            
-            anthropic_params = {
-                "model": params["model"],
-                "temperature": params.get("temperature", 0.7),
-                "anthropic_api_key": params["api_key"],
-                "timeout": params.get("timeout", 30),
-            }
-            
-            if params.get("max_tokens"):
-                anthropic_params["max_tokens"] = params["max_tokens"]
-            if params.get("api_url"):
-                anthropic_params["anthropic_api_url"] = params["api_url"]
-                
-            return ChatAnthropic(**anthropic_params)
-        except ImportError:
-            raise ImportError("langchain_anthropic not available. Install with: pip install langchain-anthropic")
-    
-    @staticmethod
-    def _create_azure_openai(params: Dict[str, Any]) -> BaseLanguageModel:
-        """Create Azure OpenAI LLM instance."""
-        try:
-            from langchain_openai import AzureChatOpenAI
-            
-            azure_params = {
-                "azure_deployment": params["deployment_name"],
-                "temperature": params.get("temperature", 0.7),
-                "openai_api_key": params["api_key"],
-                "azure_endpoint": params["azure_endpoint"],
-                "openai_api_version": params.get("api_version", "2024-02-15-preview"),
-                "timeout": params.get("timeout", 30),
-            }
-            
-            if params.get("max_tokens"):
-                azure_params["max_tokens"] = params["max_tokens"]
-                
-            return AzureChatOpenAI(**azure_params)
-        except ImportError:
-            raise ImportError("langchain_openai not available. Install with: pip install langchain-openai")
     
     @staticmethod
     def _create_google(params: Dict[str, Any]) -> BaseLanguageModel:
@@ -263,26 +165,6 @@ class LLMFactory:
             return ChatGroq(**groq_params)
         except ImportError:
             raise ImportError("langchain_groq not available. Install with: pip install langchain-groq")
-    
-    @staticmethod
-    def _create_local(params: Dict[str, Any]) -> BaseLanguageModel:
-        """Create local LLM instance."""
-        try:
-            from langchain_community.llms import HuggingFacePipeline
-            from transformers import pipeline
-            
-            # Create HuggingFace pipeline
-            pipe = pipeline(
-                "text-generation",
-                model=params["model_path"],
-                device=params.get("device", "auto"),
-                max_new_tokens=params.get("max_tokens", 512),
-                temperature=params.get("temperature", 0.7),
-            )
-            
-            return HuggingFacePipeline(pipeline=pipe)
-        except ImportError:
-            raise ImportError("transformers not available. Install with: pip install transformers torch")
 
 
 def load_llm_config(config_path: str) -> AgentLLMConfig:
