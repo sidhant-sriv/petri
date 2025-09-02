@@ -151,9 +151,11 @@ def _parse_llm_response_with_retry(
             print(f"⚠️ PydanticOutputParser failed on attempt {attempt + 1}: {e}")
             last_error = e
             
+            # Clean the response once and reuse for both attempts
+            cleaned_content = _clean_llm_response(response_content)
+            
             # Attempt 2: Try cleaning the response and parsing again
             try:
-                cleaned_content = _clean_llm_response(response_content)
                 if cleaned_content != response_content:
                     decision = parser.parse(cleaned_content)
                     print(f"✅ Successfully parsed cleaned response with PydanticOutputParser (attempt {attempt + 1})")
@@ -163,7 +165,6 @@ def _parse_llm_response_with_retry(
             
             # Attempt 3: Manual JSON parsing as fallback
             try:
-                cleaned_content = _clean_llm_response(response_content)
                 decision_data = json.loads(cleaned_content)
                 decision = AgentDecision(**decision_data)
                 print(f"✅ Fallback manual parsing succeeded (attempt {attempt + 1})")
