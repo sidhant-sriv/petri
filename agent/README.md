@@ -2,7 +2,7 @@
 
 **Version:** 2.0  
 **Component:** `agent`  
-**Core Technologies:** LangGraph, ChatOllama, Self-Awareness System
+**Core Technologies:** LangGraph, Multi-Provider LLM System, Self-Awareness System
 
 -----
 
@@ -17,6 +17,7 @@ The **Petri Agent System** is an advanced AI framework that enables autonomous a
 - **🎯 Smart Self-Commenting**: Appropriate self-reflection and clarification
 - **⚡ Structured Output**: JSON-validated decisions with confidence scoring
 - **🔄 Error Recovery**: Graceful degradation and fallback behaviors
+- **🔧 Multi-Provider LLM Support**: Configurable LLM providers (Ollama, OpenAI, Anthropic, etc.) with YAML configuration
 
 ### 📚 **Documentation**
 
@@ -29,6 +30,7 @@ This repository contains comprehensive documentation for the Petri Agent System:
 #### **Core Systems**
 - **[Router System](docs/ROUTER_SYSTEM.md)**: Deep dive into the decision-making architecture
 - **[Self-Awareness](docs/SELF_AWARENESS.md)**: Advanced social intelligence features
+- **[LLM Configuration](docs/LLM_CONFIGURATION.md)**: Multi-provider LLM setup and configuration
 
 #### **Overview Documentation**
 - **[Complete Documentation](docs/README.md)**: Comprehensive system overview and architecture

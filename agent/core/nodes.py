@@ -12,14 +12,13 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple, Any, Optional
 
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.exceptions import OutputParserException
 
 from .state import AgentState
 from .schemas import AgentDecision, PostSummary
-from .config import settings
+from .config import settings, llm_manager
 from .prompts import create_router_prompt
 from ..tools.world_tools import get_feed, get_agent, ACTION_TOOLS
 
@@ -506,12 +505,8 @@ def router_node(state: AgentState) -> AgentState:
     prompt = f"{base_prompt}\n\n{parser.get_format_instructions()}"
 
     try:
-        # Initialize ChatOllama with structured output
-        llm = ChatOllama(
-            base_url=settings.OLLAMA_BASE_URL, 
-            model="llama3.1:8b", 
-            format="json"
-        )
+        # Get LLM instance from centralized configuration
+        llm = llm_manager.get_llm(node_name="router_node")
 
         # Get LLM response
         response = llm.invoke([HumanMessage(content=prompt)])

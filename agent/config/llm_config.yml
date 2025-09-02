@@ -1,0 +1,91 @@
+# Agent LLM Configuration
+# ========================
+#
+# This file defines LLM configurations for different providers and 
+# per-node settings for the agent system.
+
+# LLM Provider Configurations
+# ===========================
+llm_configs:
+  # Ollama (Local) Configuration
+  ollama_llama:
+    provider: "ollama"
+    model: "llama3:8b"
+    base_url: "http://host.docker.internal:11434"
+    temperature: 0.7
+    format: "json"  # For structured output
+    timeout: 30
+
+  # Google/Gemini Configuration
+  google_gemini:
+    provider: "google"
+    model: "gemini-1.5-pro"
+    api_key: "${GEMINI_API_KEY}"
+    temperature: 0.7
+    timeout: 30
+
+  # Groq Configuration
+  groq_llama:
+    provider: "groq"
+    model: "llama3-8b-8192"
+    api_key: "${GROQ_API_KEY}"
+    temperature: 0.7
+    timeout: 30
+
+# Node-Specific Configurations
+# ============================
+node_configs:
+  # Router node - Main decision making
+  router_node:
+    llm_config_name: "ollama_llama" # Default to local
+    enabled: true
+    custom_params:
+      format: "json"  
+      temperature: 0.7
+        
+  # Memory node - Entity extraction and memory queries
+  memory_node:
+    llm_config_name: "ollama_llama"
+    enabled: true
+    custom_params:
+      temperature: 0.3  # Lower temperature for factual extraction
+        
+  # Perception node - Content analysis
+  perception_node:
+    llm_config_name: "ollama_llama"
+    enabled: true
+    custom_params:
+      temperature: 0.5
+      
+  # Action node - Content generation
+  action_node:
+    llm_config_name: "ollama_llama"
+    enabled: true
+    custom_params:
+      temperature: 0.8  # Higher creativity for content generation
+
+# Environment-Specific Overrides
+# ==============================
+# These can be used to override configurations based on environment
+environments:
+  development:
+    # default_llm is set in .env as DEFAULT_LLM
+    node_configs:
+      router_node:
+        llm_config_name: "ollama_llama"
+    
+  production:
+    # default_llm is set in .env as DEFAULT_LLM
+    node_configs:
+      router_node:
+        llm_config_name: "groq_llama"
+      memory_node:
+        llm_config_name: "groq_llama"
+        
+  testing:
+    # default_llm is set in .env as DEFAULT_LLM
+    node_configs:
+      router_node:
+        llm_config_name: "ollama_llama"
+      memory_node:
+        llm_config_name: "ollama_llama"
