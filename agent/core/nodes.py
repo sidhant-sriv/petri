@@ -7,15 +7,18 @@ thought process: Perceive, Remember, Think, and Act.
 """
 
 import json
+import time
 import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple, Any, Optional
 
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.exceptions import OutputParserException
 
 from .state import AgentState
-from .schemas import AgentDecision, PostSummary, FeedContext
+from .schemas import AgentDecision, PostSummary
 from .config import settings
 from .prompts import create_router_prompt
 from ..tools.world_tools import get_feed, get_agent, ACTION_TOOLS
@@ -25,6 +28,8 @@ DEFAULT_PERSONA = "A curious agent exploring the world."
 DEFAULT_AGENT_PREFIX = "Agent_"
 CONTENT_PREVIEW_LENGTH = 100
 MIN_CONFIDENCE = 0.1
+MAX_PARSER_RETRIES = 3
+PARSER_RETRY_DELAY = 1.0  # seconds
 CONFIDENCE_REDUCTION_FACTORS = {
     'valid_unaware': 0.7,
     'aware_unclear': 0.8,
@@ -110,6 +115,83 @@ def _categorize_posts_by_author(posts: List[Any], agent_name: str) -> Tuple[List
         target_list.append(summary)
     
     return own_posts, other_posts
+
+
+def _create_decision_parser() -> PydanticOutputParser:
+    """Create a PydanticOutputParser for AgentDecision validation."""
+    return PydanticOutputParser(pydantic_object=AgentDecision)
+
+
+def _parse_llm_response_with_retry(
+    response_content: str, 
+    parser: PydanticOutputParser, 
+    max_retries: int = MAX_PARSER_RETRIES
+) -> AgentDecision:
+    """
+    Parse LLM response with retry logic and comprehensive fallback handling.
+    
+    Args:
+        response_content: Raw LLM response content
+        parser: PydanticOutputParser instance
+        max_retries: Maximum number of parsing attempts
+        
+    Returns:
+        AgentDecision object (either parsed successfully or fallback)
+    """
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            # Attempt 1: Direct parsing with PydanticOutputParser
+            decision = parser.parse(response_content)
+            print(f"✅ Successfully parsed LLM response with PydanticOutputParser (attempt {attempt + 1})")
+            return decision
+            
+        except OutputParserException as e:
+            print(f"⚠️ PydanticOutputParser failed on attempt {attempt + 1}: {e}")
+            last_error = e
+            
+            # Attempt 2: Try cleaning the response and parsing again
+            try:
+                cleaned_content = _clean_llm_response(response_content)
+                if cleaned_content != response_content:
+                    decision = parser.parse(cleaned_content)
+                    print(f"✅ Successfully parsed cleaned response with PydanticOutputParser (attempt {attempt + 1})")
+                    return decision
+            except Exception as clean_error:
+                print(f"⚠️ Cleaned parsing also failed: {clean_error}")
+            
+            # Attempt 3: Manual JSON parsing as fallback
+            try:
+                cleaned_content = _clean_llm_response(response_content)
+                decision_data = json.loads(cleaned_content)
+                decision = AgentDecision(**decision_data)
+                print(f"✅ Fallback manual parsing succeeded (attempt {attempt + 1})")
+                return decision
+                
+            except (json.JSONDecodeError, ValueError) as manual_error:
+                print(f"⚠️ Manual parsing also failed: {manual_error}")
+                last_error = manual_error
+            
+            # Add delay before retry (except on last attempt)
+            if attempt < max_retries - 1:
+                print(f"🔄 Retrying in {PARSER_RETRY_DELAY} seconds...")
+                time.sleep(PARSER_RETRY_DELAY)
+        
+        except Exception as e:
+            print(f"⚠️ Unexpected error during parsing attempt {attempt + 1}: {e}")
+            last_error = e
+            
+            if attempt < max_retries - 1:
+                print(f"🔄 Retrying in {PARSER_RETRY_DELAY} seconds...")
+                time.sleep(PARSER_RETRY_DELAY)
+    
+    # All retry attempts failed, return fallback decision
+    error_msg = f"All {max_retries} parsing attempts failed. Last error: {last_error}"
+    print(f"❌ {error_msg}")
+    return _create_fallback_decision(
+        f"Failed to parse LLM response after {max_retries} attempts: {str(last_error)}"
+    )
 
 
 def _clean_llm_response(content: str) -> str:
@@ -200,13 +282,13 @@ def _validate_self_comment_decision(decision: AgentDecision, state: AgentState) 
     return decision
 
 
-def _create_fallback_decision(reason: str, confidence: float = MIN_CONFIDENCE) -> Dict[str, Any]:
+def _create_fallback_decision(reason: str, confidence: float = MIN_CONFIDENCE) -> AgentDecision:
     """Create a fallback decision when processing fails."""
-    return {
-        "action": "do_nothing",
-        "reasoning": reason,
-        "confidence": confidence,
-    }
+    return AgentDecision(
+        action="do_nothing",
+        reasoning=reason,
+        confidence=confidence
+    )
 
 
 def _update_state_with_decision(state: AgentState, decision: AgentDecision) -> None:
@@ -408,13 +490,19 @@ def router_node(state: AgentState) -> AgentState:
 
     print(f"📊 Feed analysis: {len(own_posts)} own posts, {len(other_posts)} others' posts")
 
-    # Create the prompt for the LLM
-    prompt = create_router_prompt(
+    # Create the PydanticOutputParser for structured validation
+    parser = _create_decision_parser()
+    
+    # Create the prompt for the LLM with format instructions
+    base_prompt = create_router_prompt(
         agent_name=state["agent_name"],
         persona=state["persona"],
         own_posts=own_posts,
         other_posts=other_posts,
     )
+    
+    # Add format instructions from the parser
+    prompt = f"{base_prompt}\n\n{parser.get_format_instructions()}"
 
     try:
         # Initialize ChatOllama with structured output
@@ -428,22 +516,11 @@ def router_node(state: AgentState) -> AgentState:
         response = llm.invoke([HumanMessage(content=prompt)])
         print(f"🔍 Raw LLM response: {response.content}")
 
-        # Parse and validate the response
-        try:
-            cleaned_content = _clean_llm_response(response.content)
-            decision_data = json.loads(cleaned_content)
-            decision = AgentDecision(**decision_data)
-            
-            # Validate self-commenting decisions
-            decision = _validate_self_comment_decision(decision, state)
-
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"⚠️ Failed to parse LLM response as JSON: {e}")
-            print(f"Raw response: {response.content}")
-            
-            decision = AgentDecision(**_create_fallback_decision(
-                "Failed to parse LLM response, staying quiet"
-            ))
+        # Parse and validate the response using PydanticOutputParser with retry logic
+        decision = _parse_llm_response_with_retry(response.content, parser)
+        
+        # Validate self-commenting decisions
+        decision = _validate_self_comment_decision(decision, state)
 
         # Update state and log decision
         _update_state_with_decision(state, decision)
@@ -454,7 +531,7 @@ def router_node(state: AgentState) -> AgentState:
         fallback_decision = _create_fallback_decision(f"Router failed due to error: {str(e)}", 0.0)
         
         state.update({
-            "llm_decision": fallback_decision,
+            "llm_decision": fallback_decision.model_dump(),
             "action_to_perform": "DO_NOTHING",
             "output_text": None,
             "target_post_id": None
