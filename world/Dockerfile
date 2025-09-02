@@ -12,13 +12,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the unified requirements file from project root
-COPY ../requirements.txt /app/
+COPY requirements.txt /app/
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application's code into the container at /app
-COPY ./app /app/app
+COPY ./world/app /app/app
 
 # Command to run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
