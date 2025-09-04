@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "petri_password"
     POSTGRES_DB: str = "petri_world"
 
+    # Redis Configuration  
+    REDIS_URL: str = "redis://redis:6379/0"
+
     # API Configuration
     API_KEY: str
 

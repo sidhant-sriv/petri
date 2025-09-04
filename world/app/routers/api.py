@@ -5,8 +5,19 @@ from typing import List
 from .. import crud, models, schemas
 from ..db import get_db
 from ..dependencies import get_api_key
+from ..redis_client import REDIS_AVAILABLE
 
 router = APIRouter()
+
+
+# Health Check Endpoint
+@router.get("/health")
+def health_check():
+    """Health check endpoint that includes Redis status"""
+    return {
+        "status": "ok",
+        "redis_available": REDIS_AVAILABLE
+    }
 
 
 # Agent Endpoints

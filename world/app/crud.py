@@ -1,14 +1,90 @@
 from sqlalchemy.orm import Session, joinedload
 from . import models, schemas
+from .redis_client import AgentCache
+from datetime import datetime
 
 
 # Agent CRUD
 def get_agent(db: Session, agent_id: int):
-    return db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    # Try cache first
+    cached_agent = AgentCache.get_agent(agent_id)
+    if cached_agent:
+        # Create a proper Agent model instance from cached data
+        try:
+            created_at_str = cached_agent["created_at"]
+            if isinstance(created_at_str, str):
+                # Handle ISO format with or without timezone
+                created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+            else:
+                created_at = created_at_str
+        except (ValueError, TypeError):
+            # If datetime parsing fails, fetch from database instead
+            cached_agent = None
+        
+        if cached_agent:
+            agent = models.Agent(
+                id=cached_agent["id"],
+                name=cached_agent["name"], 
+                persona=cached_agent["persona"],
+                created_at=created_at
+            )
+            return agent
+    
+    # Cache miss or parsing error - get from database
+    db_agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    
+    # Cache the result if found
+    if db_agent:
+        agent_data = {
+            "id": db_agent.id,
+            "name": db_agent.name,
+            "persona": db_agent.persona,
+            "created_at": db_agent.created_at
+        }
+        AgentCache.set_agent(agent_data)
+    
+    return db_agent
 
 
 def get_agent_by_name(db: Session, name: str):
-    return db.query(models.Agent).filter(models.Agent.name == name).first()
+    # Try cache first
+    cached_agent = AgentCache.get_agent_by_name(name)
+    if cached_agent:
+        # Create a proper Agent model instance from cached data
+        try:
+            created_at_str = cached_agent["created_at"]
+            if isinstance(created_at_str, str):
+                # Handle ISO format with or without timezone
+                created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+            else:
+                created_at = created_at_str
+        except (ValueError, TypeError):
+            # If datetime parsing fails, fetch from database instead
+            cached_agent = None
+        
+        if cached_agent:
+            agent = models.Agent(
+                id=cached_agent["id"],
+                name=cached_agent["name"],
+                persona=cached_agent["persona"],
+                created_at=created_at
+            )
+            return agent
+    
+    # Cache miss or parsing error - get from database
+    db_agent = db.query(models.Agent).filter(models.Agent.name == name).first()
+    
+    # Cache the result if found
+    if db_agent:
+        agent_data = {
+            "id": db_agent.id,
+            "name": db_agent.name,
+            "persona": db_agent.persona,
+            "created_at": db_agent.created_at
+        }
+        AgentCache.set_agent(agent_data)
+    
+    return db_agent
 
 
 def get_agents(db: Session, skip: int = 0, limit: int = 100):
@@ -20,15 +96,37 @@ def create_agent(db: Session, agent: schemas.AgentCreate):
     db.add(db_agent)
     db.commit()
     db.refresh(db_agent)
+    
+    # Cache the newly created agent
+    agent_data = {
+        "id": db_agent.id,
+        "name": db_agent.name,
+        "persona": db_agent.persona,
+        "created_at": db_agent.created_at
+    }
+    AgentCache.set_agent(agent_data)
+    
     return db_agent
 
 
 def update_agent_persona(db: Session, agent_id: int, new_persona: str):
     db_agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if db_agent:
+        old_name = db_agent.name
         db_agent.persona = new_persona
         db.commit()
         db.refresh(db_agent)
+        
+        # Invalidate old cache and set new cache
+        AgentCache.invalidate_agent(agent_id, old_name)
+        agent_data = {
+            "id": db_agent.id,
+            "name": db_agent.name,
+            "persona": db_agent.persona,
+            "created_at": db_agent.created_at
+        }
+        AgentCache.set_agent(agent_data)
+    
     return db_agent
 
 
