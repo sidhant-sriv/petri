@@ -1,7 +1,7 @@
 # Petri Project Makefile
 # Unified commands for development and deployment
 
-.PHONY: help build up down logs clean dev-up prod-up
+.PHONY: help build up down logs clean dev-up prod-up genesis genesis-dry-run genesis-random genesis-custom
 
 help: ## Show this help message
 	@echo "Petri Project Commands:"
@@ -45,3 +45,15 @@ setup:
 	cp env.example .env
 	@echo "Please edit .env file with your configuration"
 	@echo "Run 'make dev-up' to start development services"
+
+genesis: ## Create founding population of agents from population.yml
+	python genesis-chamber/genesis.py
+
+genesis-dry-run: ## Preview what agents would be created without actually creating them
+	python genesis-chamber/genesis.py --dry-run
+
+genesis-random: ## Generate random agents using LLM (use COUNT=5 THEMES="scientist,artist")
+	python genesis-chamber/genesis.py --random $(if ${COUNT},${COUNT},5) $(if ${THEMES},--random-themes ${THEMES})
+
+genesis-custom: ## Create agents from a custom manifest file (use MANIFEST=path/to/file.yml)
+	python genesis-chamber/genesis.py --manifest ${MANIFEST}
